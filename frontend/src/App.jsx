@@ -8,8 +8,9 @@ function App() {
   const LAZY_RADIUS = 60;
   const BRUSH_RADIUS = 5;
   const isDrawingRef = useRef(false);
+  const xRef = useRef(0);
+  const yRef = useRef(0);
   const canvasContainerRef = useRef();
-  // const lastPosRef = useRef({ x: 0, y: 0 }); // Ref for tracking the last position
 
   const canvasRef = useRef();
 
@@ -38,7 +39,6 @@ function App() {
   useEffect(() => {
     const canvas = canvasRef.current;
     const canvasContainer = canvasContainerRef.current;
-
     const { width, height } = window.getComputedStyle(canvasContainer);
 
     canvas.width = parseInt(width.split("p")[0]);
@@ -53,34 +53,26 @@ function App() {
     const offscreenCtx = offscreenCanvas.getContext("2d");
 
     const handleMouseDown = (event) => {
-      console.log("press")
       isDrawingRef.current = true;
-      const rect = canvas.getBoundingClientRect();
-      const x = event.x - rect.left;
-      const y = event.y - rect.top;
-
-      offscreenCtx.beginPath();
-      offscreenCtx.strokeStyle = "#000000";
-      offscreenCtx.lineWidth = 7;
-      offscreenCtx.lineCap = "round";
-      offscreenCtx.lineTo(x, y);
-      offscreenCtx.stroke();
+      console.log("Press", event);
     };
     const midPointBtw = (p1, p2) => {
       return {
         x: p1.x + (p2.x - p1.x) / 2,
         y: p1.y + (p2.y - p1.y) / 2,
       };
-    }
-    const handleMouseMove = (event) => {
+    };
+    const handlePointerMove = (newX, newY) => {
       const rect = canvas.getBoundingClientRect();
-      // console.log(event.pageX, event.clientX)
-      const x = event.x - rect.left;
-      const y = event.y - rect.top;
-      // console.log({x, y}, event)
-
-      lazy.update({ x, y });
-      lazyFriction.update({ x, y }, { friction: 0.5 });
+      xRef.current = newX - rect.left;
+      yRef.current = newY - rect.top;
+    };
+    const handleDraw = (pressure) => {
+      lazy.update({ x: xRef.current, y: yRef.current });
+      lazyFriction.update(
+        { x: xRef.current, y: yRef.current },
+        { friction: 0.5 }
+      );
 
       //this make lazy the stroke
       const brush = lazy.getBrushCoordinates();
@@ -88,48 +80,48 @@ function App() {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(offscreenCanvas, 0, 0);
-
       // Draw brush point IF
       if (isDrawingRef.current) {
-        //this is for draw intermedial points in the stroke.
 
         //here is when style of the draw most change.
-        points.push({ x, y });
+        points.push({ x: xRef.current, y: yRef.current, pressure: pressure });
 
         let p1 = points[0];
         let p2 = points[1];
 
         if (p2 === undefined) return;
 
-        offscreenCtx.moveTo(p2.x, p2.y);
-        offscreenCtx.beginPath();
-
         for (let i = 1, len = points.length; i < len; i++) {
           // we pick the point between pi+1 & pi+2 as the
           // end point and p1 as our control point
           const midPoint = midPointBtw(p1, p2);
+
+          offscreenCtx.moveTo(p2.x, p2.y);
+          offscreenCtx.beginPath();
+
+          offscreenCtx.lineWidth = Math.max(points[i].pressure * 10, 1);
+          offscreenCtx.strokeStyle = "#000000";
+          offscreenCtx.lineCap = "round";
+
           offscreenCtx.quadraticCurveTo(p1.x, p1.y, midPoint.x, midPoint.y);
+          offscreenCtx.lineTo(p1.x, p1.y);
+          offscreenCtx.stroke();
+
           p1 = points[i];
           p2 = points[i + 1];
         }
         //style the stoke
-        offscreenCtx.strokeStyle = "#000000";
-        offscreenCtx.lineWidth = 5;
-        offscreenCtx.lineCap = "round";
-        offscreenCtx.lineTo(p1.x, p1.y);
-        offscreenCtx.stroke();
       }
+
       //stroke preview
       ctx.beginPath();
       ctx.fillStyle = "blue";
-      ctx.arc(x, y, BRUSH_RADIUS, 0, Math.PI * 2, true);
+      ctx.arc(xRef.current, yRef.current, BRUSH_RADIUS, 0, Math.PI * 2, true);
       ctx.fill();
-
-      //Draw the lazy radius.
-      // ctx.beginPath();
-      // ctx.strokeStyle = "#ccc";
-      // ctx.arc(brush.x, brush.y, LAZY_RADIUS, 0, Math.PI * 2, true);
-      // ctx.stroke();
+    };
+    const handleMove = (event) => {
+      handlePointerMove(event.clientX, event.clientY);
+      handleDraw(event.pressure);
     };
     const handleMouseUp = () => {
       isDrawingRef.current = false;
@@ -137,16 +129,27 @@ function App() {
       offscreenCtx.closePath();
       points.length = 0;
     };
+    const touchMove = (event) => {
+      handlePointerMove(
+        event.changedTouches[0].clientX,
+        event.changedTouches[0].clientY
+      );
+      handleDraw(event.changedTouches[0].force);
+    };
 
+    canvas.addEventListener("pointermove", handleMove);
+    canvas.addEventListener("touchmove", touchMove);
     canvas.addEventListener("pointerdown", handleMouseDown);
-    canvas.addEventListener("pointermove", handleMouseMove);
-    window.addEventListener("pointerup", handleMouseUp); // Capture mouse up globally
-    // requestAnimationFrame(handleMouseMove);
+    window.addEventListener("touchend", handleMouseUp);
+    window.addEventListener("pointerup", handleMouseUp);
 
     return () => {
+      canvas.addEventListener("pointermove", handleMove);
+      canvas.addEventListener("touchmove", touchMove);
       canvas.addEventListener("pointerdown", handleMouseDown);
-      canvas.removeEventListener("pointermove", handleMouseMove);
-      window.addEventListener("pointerup", handleMouseUp); // Capture mouse up globally
+      window.addEventListener("touchend", handleMouseUp);
+      window.addEventListener("pointerup", handleMouseUp);
+
     };
   }, [lazy, lazyFriction]);
 

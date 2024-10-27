@@ -1,5 +1,8 @@
 ## Issues
 -   no funciona del todo bien con la tableta.
+-   no registra el punto.
+-   funciona con los niveles de presion pero una linea larga genera muchos points y perjudica el rendimiento.
+-   al dibujar hay un momento en donde el cursor se va a un punto de la pantalla y despues vuelve, no perjudica en nada pero hace eso raro.
 
 
 ## Todo
