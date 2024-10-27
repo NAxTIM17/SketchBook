@@ -96,8 +96,8 @@ function App() {
           // end point and p1 as our control point
           const midPoint = midPointBtw(p1, p2);
 
-          offscreenCtx.moveTo(p2.x, p2.y);
           offscreenCtx.beginPath();
+          offscreenCtx.moveTo(p2.x, p2.y);
 
           offscreenCtx.lineWidth = Math.max(points[i].pressure * 10, 1);
           offscreenCtx.strokeStyle = "#000000";
